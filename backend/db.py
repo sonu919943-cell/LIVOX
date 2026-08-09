@@ -5,7 +5,7 @@ def get_db_connection():
         host ="localhost",
         user ="root",
         password="9iyu$hKumar",
-        database="LOVIX"
+        database="livox"
     )
 
     return conn
