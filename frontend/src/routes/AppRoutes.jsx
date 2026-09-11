@@ -1,15 +1,1 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
-import Dashboard from '../pages/Dashboard/Dashboard'
-import Login from '../pages/Login/Login'
-import Signup from '../pages/Signup/Signup'
-
-export default function AppRoutes() {
-  return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
-  )
-}
+import { Navigate, Route, Routes } from 'react-router-dom'; import Login from '../pages/Login/Login'; import Signup from '../pages/Signup/Signup'; import CareWorkspace from '../pages/CareWorkspace/CareWorkspace'; export default function AppRoutes(){return <Routes><Route path="/login" element={<Login/>}/><Route path="/signup" element={<Signup/>}/><Route path="/dashboard" element={<CareWorkspace screen="dashboard"/>}/><Route path="/medical-profile" element={<CareWorkspace screen="profile"/>}/><Route path="/emergency-contacts" element={<CareWorkspace screen="contacts"/>}/><Route path="/reports" element={<CareWorkspace screen="reports"/>}/><Route path="/qr-code" element={<CareWorkspace screen="qr"/>}/><Route path="/hospitals" element={<CareWorkspace screen="hospitals"/>}/><Route path="/blood-donor" element={<CareWorkspace screen="donors"/>}/><Route path="/ai-assistant" element={<CareWorkspace screen="assistant"/>}/><Route path="/account" element={<CareWorkspace screen="account"/>}/><Route path="/settings" element={<CareWorkspace screen="settings"/>}/><Route path="*" element={<Navigate to="/login" replace/>}/></Routes>}
