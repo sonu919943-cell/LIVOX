@@ -1,1 +1,5 @@
-import CareWorkspace from '../../components/CareWorkspace/CareWorkspace'; export default function MedicalProfile(){return <CareWorkspace screen="profile"/>}
+import CareWorkspace from "../../components/CareWorkspace/CareWorkspace";
+
+export default function MedicalProfile({ userName }) {
+  return <CareWorkspace screen="profile" userName={userName} />;
+}

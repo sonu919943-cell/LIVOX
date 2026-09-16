@@ -12,16 +12,16 @@ CREATE TABLE users (
 );
 
 CREATE TABLE medical_profile (
-	name VARCHAR(50) PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+	name VARCHAR(50) NOT NULL,
     dob date NOT NULL,
-    bloodgroup VARCHAR(5) NOT NULL,
-    phone INT NOT NULL,
+    bloodgroup VARCHAR(20) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
     address VARCHAR(255) NOT NULL,
     Allergies VARCHAR(100),
     Existing_conditions VARCHAR(100),
     Current_medications VARCHAR(100),
-    user_id INT,
+    user_id INT UNIQUE,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
-
     

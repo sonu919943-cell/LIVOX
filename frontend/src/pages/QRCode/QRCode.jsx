@@ -1,1 +1,5 @@
-import CareWorkspace from '../../components/CareWorkspace/CareWorkspace'; export default function QRCode(){return <CareWorkspace screen="qr"/>}
+import CareWorkspace from "../../components/CareWorkspace/CareWorkspace";
+
+export default function QRCode({ userName }) {
+  return <CareWorkspace screen="qr" userName={userName} />;
+}

@@ -8,7 +8,7 @@ auth = Blueprint("auth",__name__)
 @auth.route("/login", methods=["POST"])
 def login():
 
-    data = request.get_json()
+    data = request.get_json() or {}
 
     email = data.get("email")
     password = data.get("password")
@@ -67,7 +67,7 @@ def login():
 @auth.route("/signup",methods =["POST"])
 def signup():
 
-    data = request.get_json()
+    data = request.get_json() or {}
 
     name = data.get("name")
     phone = data.get("phone")
@@ -102,7 +102,7 @@ def signup():
 
         return jsonify({
             "message": "Email id already registered"
-        })
+        }), 409
 
     password =  generate_password_hash(password)
 

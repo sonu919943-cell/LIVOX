@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { api } from "../../services/api";
 const menu = [
   ["Overview", "/dashboard", "dashboard"],
   ["Medical profile", "/medical-profile", "profile"],
@@ -12,8 +13,8 @@ const menu = [
   ["Account", "/account", "account"],
   ["Settings", "/settings", "settings"],
 ];
-const initial = {
-  name: "Sonu Kumar",
+const createInitialProfile = (userName) => ({
+  name: userName,
   dob: "",
   blood: "",
   phone: "",
@@ -21,7 +22,21 @@ const initial = {
   allergies: "",
   conditions: "",
   medications: "",
-};
+});
+
+function getFirstName(name) {
+  return name.split(" ")[0] || "there";
+}
+
+function getInitials(name) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 const Field = ({ label, value, onChange, placeholder, type = "text" }) => (
   <label className="care-field">
     <span>{label}</span>
@@ -56,16 +71,18 @@ const Panel = ({ title, caption, children, action }) => (
     {children}
   </section>
 );
-export default function CareWorkspace({ screen }) {
+export default function CareWorkspace({ screen, userName = "Guest User" }) {
+  const initials = getInitials(userName);
+  const token = window.localStorage.getItem("livoxToken");
   const [notice, setNotice] = useState("");
-  const [profile, setProfile] = useState(initial);
+  const [profile, setProfile] = useState(() => createInitialProfile(userName));
   const [contacts, setContacts] = useState([
     { name: "Aarav Kumar", relation: "Brother", phone: "+91 98765 43210" },
   ]);
   const [messages, setMessages] = useState([
     {
       role: "assistant",
-      text: "Hi Sonu. I can help you organize your LIVOX health information.",
+      text: `Hi ${getFirstName(userName)}. I can help you organize your LIVOX health information.`,
     },
   ]);
   const [message, setMessage] = useState("");
@@ -74,33 +91,75 @@ export default function CareWorkspace({ screen }) {
     setProfile({ ...profile, [key]: value });
     setNotice("");
   };
-  const body =
-    screen === "dashboard" ? (
-      <Dashboard />
-    ) : screen === "profile" ? (
-      <Profile profile={profile} update={update} save={save} />
-    ) : screen === "contacts" ? (
-      <Contacts contacts={contacts} setContacts={setContacts} save={save} />
-    ) : screen === "reports" ? (
-      <Reports save={save} />
-    ) : screen === "qr" ? (
-      <QR save={save} />
-    ) : screen === "hospitals" ? (
-      <Hospitals save={save} />
-    ) : screen === "donors" ? (
-      <Donors save={save} />
-    ) : screen === "assistant" ? (
-      <Assistant
-        messages={messages}
-        message={message}
-        setMessage={setMessage}
-        setMessages={setMessages}
-      />
-    ) : screen === "account" ? (
-      <Account save={save} />
-    ) : (
-      <Settings save={save} />
-    );
+  const saveProfile = async () => {
+    if (!token) {
+      setNotice("Please sign in again before saving your medical profile.");
+      return;
+    }
+
+    try {
+      await api("/medical-profile", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: profile.name,
+          dob: profile.dob,
+          blood_group: profile.blood,
+          phone: profile.phone,
+          address: profile.address,
+          allergies: profile.allergies,
+          existing_conditions: profile.conditions,
+          current_medications: profile.medications,
+        }),
+      });
+      setNotice("Medical profile saved.");
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+
+    api("/medical-profile", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((data) => {
+        const record = data.records?.[0];
+        if (!record) return;
+
+        setProfile({
+          name: record.name || userName,
+          dob: record.dob || "",
+          blood: record.blood_group || "",
+          phone: record.phone || "",
+          address: record.address || "",
+          allergies: record.allergies || "",
+          conditions: record.existing_conditions || "",
+          medications: record.current_medications || "",
+        });
+      })
+      .catch((error) => setNotice(error.message));
+  }, [token, userName]);
+
+  const body = renderScreen({
+    contacts,
+    message,
+    messages,
+    profile,
+    save,
+    saveProfile,
+    screen,
+    setContacts,
+    setMessage,
+    setMessages,
+    update,
+    userName,
+  });
   return (
     <div className="care-shell">
       <header className="care-top">
@@ -111,14 +170,14 @@ export default function CareWorkspace({ screen }) {
         <div className="care-top__meta">
           <span>Secure health workspace</span>
           <button aria-label="Notifications">Notifications</button>
-          <i>SK</i>
+          <i>{initials}</i>
         </div>
       </header>
       <aside className="care-side">
         <div className="care-person">
-          <i>SK</i>
+          <i>{initials}</i>
           <div>
-            <strong>Sonu Kumar</strong>
+            <strong>{userName}</strong>
             <span>Personal account</span>
           </div>
         </div>
@@ -154,7 +213,62 @@ export default function CareWorkspace({ screen }) {
     </div>
   );
 }
-function Dashboard() {
+
+function renderScreen({
+  contacts,
+  message,
+  messages,
+  profile,
+  save,
+  saveProfile,
+  screen,
+  setContacts,
+  setMessage,
+  setMessages,
+  update,
+  userName,
+}) {
+  switch (screen) {
+    case "dashboard":
+      return <Dashboard userName={userName} />;
+    case "profile":
+      return <Profile profile={profile} update={update} saveProfile={saveProfile} />;
+    case "contacts":
+      return (
+        <Contacts contacts={contacts} setContacts={setContacts} save={save} />
+      );
+    case "reports":
+      return <Reports save={save} />;
+    case "qr":
+      return <QR save={save} userName={userName} />;
+    case "hospitals":
+      return <Hospitals save={save} />;
+    case "donors":
+      return <Donors save={save} />;
+    case "assistant":
+      return (
+        <Assistant
+          messages={messages}
+          message={message}
+          setMessage={setMessage}
+          setMessages={setMessages}
+        />
+      );
+    case "account":
+      return <Account save={save} userName={userName} />;
+    default:
+      return <Settings save={save} />;
+  }
+}
+
+function Dashboard({ userName }) {
+  const today = new Intl.DateTimeFormat("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })
+    .format(new Date())
+    .toUpperCase();
   const modules = [
     [
       "Medical profile",
@@ -172,12 +286,12 @@ function Dashboard() {
     <>
       <section className="care-welcome">
         <div>
-          <p>WEDNESDAY, 11 SEPTEMBER</p>
-          <h1>Welcome back, Sonu.</h1>
+          <p>{today}</p>
+          <h1>Welcome back, {getFirstName(userName)}.</h1>
           <span>Here is the information that needs your attention today.</span>
         </div>
         <Link to="/medical-profile">
-          Complete profile <b>?</b>
+          Complete profile <b>&rarr;</b>
         </Link>
       </section>
       <section className="care-stats">
@@ -204,7 +318,7 @@ function Dashboard() {
       </section>
       <section className="care-layout">
         <Panel
-          title="Today?s checklist"
+          title="Today's checklist"
           caption="Small updates make your emergency profile more useful."
         >
           <div className="care-check">
@@ -258,7 +372,7 @@ function Dashboard() {
               <b>0{index + 1}</b>
               <h3>{title}</h3>
               <p>{text}</p>
-              <span>Open ?</span>
+              <span>Open &rarr;</span>
             </Link>
           ))}
         </div>
@@ -266,7 +380,7 @@ function Dashboard() {
     </>
   );
 }
-function Profile({ profile, update, save }) {
+function Profile({ profile, update, saveProfile }) {
   return (
     <>
       <div className="care-heading">
@@ -284,7 +398,7 @@ function Profile({ profile, update, save }) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          save("Medical profile saved locally.");
+          saveProfile();
         }}
       >
         <Panel
@@ -471,7 +585,7 @@ function Reports({ save }) {
               <div>
                 <strong>{file.name}</strong>
                 <span>
-                  {file.type} ? {file.date}
+                  {file.type} - {file.date}
                 </span>
               </div>
               <button onClick={() => save(`Opened ${file.name}.`)}>Open</button>
@@ -482,7 +596,7 @@ function Reports({ save }) {
     </>
   );
 }
-function QR({ save }) {
+function QR({ save, userName }) {
   return (
     <>
       <div className="care-heading">
@@ -506,7 +620,7 @@ function QR({ save }) {
                 PROFILE
               </span>
             </div>
-            <p>Sonu Kumar</p>
+            <p>{userName}</p>
             <small>Scan to access emergency health details</small>
           </div>
           <div className="care-qr-actions">
@@ -540,11 +654,11 @@ function QR({ save }) {
 function Hospitals({ save }) {
   const [searched, setSearched] = useState(false);
   const hospitals = [
-    ["City Care Hospital", "2.1 km away", "24 hours ? Emergency care"],
+    ["City Care Hospital", "2.1 km away", "24 hours - Emergency care"],
     [
       "Green Valley Medical Centre",
       "3.7 km away",
-      "24 hours ? Multi-specialty",
+      "24 hours - Multi-specialty",
     ],
     ["Sunrise Clinic", "4.5 km away", "Open until 9:00 PM"],
   ];
@@ -574,7 +688,7 @@ function Hospitals({ save }) {
           <div>
             <b>+</b>
             <span>Map view</span>
-            <small>Select ?Use my location? to refresh results.</small>
+            <small>Select "Use my location" to refresh results.</small>
           </div>
         </div>
         <div className="care-hospital-list">
@@ -584,7 +698,7 @@ function Hospitals({ save }) {
               <div>
                 <strong>{name}</strong>
                 <span>
-                  {distance} ? {detail}
+                  {distance} - {detail}
                 </span>
               </div>
               <button
@@ -682,7 +796,7 @@ function Assistant({ messages, message, setMessage, setMessages }) {
     </>
   );
 }
-function Account({ save }) {
+function Account({ save, userName }) {
   return (
     <>
       <div className="care-heading">
@@ -697,7 +811,7 @@ function Account({ save }) {
         caption="Update your personal account information."
       >
         <div className="care-form">
-          <Field label="Display name" value="Sonu Kumar" onChange={() => {}} />
+          <Field label="Display name" value={userName} onChange={() => {}} />
           <Field
             label="Email address"
             value="sonu@example.com"

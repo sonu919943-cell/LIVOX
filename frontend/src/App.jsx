@@ -1,1 +1,36 @@
-import { useEffect } from 'react'; import { Link, useLocation } from 'react-router-dom'; import AppRoutes from './routes/AppRoutes'; function UserIdentity(){const {pathname}=useLocation();useEffect(()=>{const name=window.localStorage.getItem('livoxUserName')||'Guest User';const first=name.split(' ')[0];const initials=name.split(' ').map(part=>part[0]).join('').slice(0,2).toUpperCase();document.querySelectorAll('.care-person strong').forEach(node=>node.textContent=name);document.querySelectorAll('.care-person i,.care-top__meta i').forEach(node=>node.textContent=initials);const greeting=document.querySelector('.care-welcome h1');if(greeting)greeting.textContent=`Welcome back, ${first}.`;const qrName=document.querySelector('.care-qr p');if(qrName)qrName.textContent=name;document.querySelectorAll('input').forEach(input=>{if(input.value==='Sonu Kumar')input.value=name});},[pathname]);return null} export default function App() { const { pathname } = useLocation(); const isPublicPage = pathname === '/login' || pathname === '/signup'; const logout = () => window.localStorage.clear(); return <><UserIdentity/><AppRoutes />{!isPublicPage && <Link className="global-logout" to="/login" onClick={logout}>Log out</Link>}</> }
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import AppRoutes from "./routes/AppRoutes";
+
+const DEFAULT_USER_NAME = "Guest User";
+
+function getStoredUserName() {
+  return window.localStorage.getItem("livoxUserName") || DEFAULT_USER_NAME;
+}
+
+export default function App() {
+  const { pathname } = useLocation();
+  const [userName, setUserName] = useState(getStoredUserName);
+  const isPublicPage = pathname === "/login" || pathname === "/signup";
+
+  const saveUserName = (name) => {
+    window.localStorage.setItem("livoxUserName", name);
+    setUserName(name);
+  };
+
+  const logout = () => {
+    window.localStorage.clear();
+    setUserName(DEFAULT_USER_NAME);
+  };
+
+  return (
+    <>
+      <AppRoutes userName={userName} onUserNameChange={saveUserName} />
+      {!isPublicPage && (
+        <Link className="global-logout" to="/login" onClick={logout}>
+          Log out
+        </Link>
+      )}
+    </>
+  );
+}

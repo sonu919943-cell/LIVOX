@@ -1,11 +1,19 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000";
 
 export async function api(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, options)
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...options.headers,
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`)
+    throw new Error(data.message || `Request failed with status ${response.status}`);
   }
 
-  return response.json()
+  return data;
 }
