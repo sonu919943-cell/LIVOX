@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { api } from "../../services/api";
+import { api, buildApiUrl } from "../../services/api";
 const menu = [
   ["Overview", "/dashboard", "dashboard"],
   ["Medical profile", "/medical-profile", "profile"],
@@ -159,6 +159,7 @@ export default function CareWorkspace({ screen, userName = "Guest User" }) {
     setMessages,
     update,
     userName,
+    token,
   });
   return (
     <div className="care-shell">
@@ -227,6 +228,7 @@ function renderScreen({
   setMessages,
   update,
   userName,
+  token,
 }) {
   switch (screen) {
     case "dashboard":
@@ -240,7 +242,7 @@ function renderScreen({
     case "reports":
       return <Reports save={save} />;
     case "qr":
-      return <QR save={save} userName={userName} />;
+      return <QR save={save} token={token} userName={userName} />;
     case "hospitals":
       return <Hospitals save={save} />;
     case "donors":
@@ -297,7 +299,7 @@ function Dashboard({ userName }) {
       <section className="care-stats">
         <article>
           <span>PROFILE COMPLETION</span>
-          <strong>68%</strong>
+          <strong>75%</strong>
           <div>
             <i style={{ width: "68%" }} />
           </div>
@@ -596,7 +598,33 @@ function Reports({ save }) {
     </>
   );
 }
-function QR({ save, userName }) {
+function QR({ save, token, userName }) {
+  const [qr, setQr] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const generateQr = async () => {
+    if (!token) {
+      save("Please sign in again before generating your QR card.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data = await api("/api/qr/generate", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setQr(data);
+      save("Emergency QR card generated.");
+    } catch (error) {
+      save(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <div className="care-heading">
@@ -612,27 +640,41 @@ function QR({ save, userName }) {
           caption="Only the information you choose is shared."
         >
           <div className="care-qr">
-            <div>
-              <b>LIVOX</b>
-              <span>
-                EMERGENCY
-                <br />
-                PROFILE
-              </span>
-            </div>
+            {qr?.image_url ? (
+              <img
+                alt="Emergency QR code"
+                src={buildApiUrl(qr.image_url)}
+              />
+            ) : (
+              <div>
+                <b>LIVOX</b>
+                <span>
+                  EMERGENCY
+                  <br />
+                  PROFILE
+                </span>
+              </div>
+            )}
             <p>{userName}</p>
-            <small>Scan to access emergency health details</small>
+            <small>
+              {qr?.qr_url
+                ? "Scan to access emergency health details"
+                : "Generate your QR after saving your medical profile"}
+            </small>
           </div>
           <div className="care-qr-actions">
             <button
               className="care-primary"
-              onClick={() => save("QR card download prepared locally.")}
+              onClick={generateQr}
+              disabled={loading}
             >
-              Download card
+              {loading ? "Generating..." : "Generate QR"}
             </button>
-            <button onClick={() => save("QR sharing options opened locally.")}>
-              Share securely
-            </button>
+            {qr?.image_url && (
+              <a href={buildApiUrl(qr.image_url)} download>
+                Download card
+              </a>
+            )}
           </div>
         </Panel>
         <Panel

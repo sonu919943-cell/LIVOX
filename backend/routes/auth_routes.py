@@ -1,13 +1,12 @@
-from flask import Blueprint, request,jsonify
+from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from db import get_db_connection
 from flask_jwt_extended import create_access_token
 
-auth = Blueprint("auth",__name__)
+auth = Blueprint("auth", __name__)
 
 @auth.route("/login", methods=["POST"])
 def login():
-
     data = request.get_json() or {}
 
     email = data.get("email")
@@ -19,54 +18,50 @@ def login():
         }), 400
 
     conn = get_db_connection()
-
     if conn is None:
         return jsonify({
             "message": "Database connection failed"
         }), 500
 
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT *
-        FROM users
-        WHERE email = %s
-    """, (email,))
-
-    user = cursor.fetchone()
-
-    cursor.close()
-    conn.close()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+            SELECT id, name, email, phone, password
+            FROM users
+            WHERE email = %s
+        """, (email,))
+        user = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
 
     if not user:
         return jsonify({
             "message": "Invalid email or password"
         }), 401
 
-    if not check_password_hash(user[4], password):
+    if not check_password_hash(user["password"], password):
         return jsonify({
             "message": "Invalid email or password"
         }), 401
 
-    # Create JWT token
     access_token = create_access_token(
-        identity=str(user[0])
+        identity=str(user["id"])
     )
 
     return jsonify({
         "message": "Login Successful",
         "token": access_token,
         "user": {
-            "id": user[0],
-            "name": user[1],
-            "email": user[2],
-            "phone": user[3]
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"],
+            "phone": user["phone"]
         }
     }), 200
 
-@auth.route("/signup",methods =["POST"])
+@auth.route("/signup", methods=["POST"])
 def signup():
-
     data = request.get_json() or {}
 
     name = data.get("name")
@@ -76,46 +71,39 @@ def signup():
 
     if not name or not phone or not email or not password:
         return jsonify({
-            "message":"All field are required !"
-        }),400
+            "message": "All fields are required!"
+        }), 400
 
     conn = get_db_connection()
-
     if conn is None:
         return jsonify({
             "message": "Database connection failed"
         }), 500
 
     cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id FROM users
+            WHERE email = %s
+        """, (email,))
+        existing_user = cursor.fetchone()
 
-    cursor.execute("""
-        SELECT id FROM 
-        users WHERE 
-        email =%s
-    """,(email,))
+        if existing_user:
+            return jsonify({
+                "message": "Email id already registered"
+            }), 409
 
-    existing_user = cursor.fetchone()
+        hashed_password = generate_password_hash(password)
 
-    if existing_user:
+        cursor.execute("""
+            INSERT INTO users (name, email, phone, password)
+            VALUES (%s, %s, %s, %s)
+        """, (name, email, str(phone), hashed_password))
+
+        conn.commit()
+    finally:
         cursor.close()
         conn.close()
-
-        return jsonify({
-            "message": "Email id already registered"
-        }), 409
-
-    password =  generate_password_hash(password)
-
-    cursor.execute("""
-        INSERT INTO users 
-        (name,email,phone,password)
-        VALUES (%s,%s,%s,%s)
-        """,(name,email,phone,password)
-    )
-
-    conn.commit()
-    cursor.close()
-    conn.close()
 
     return jsonify({
         "message": "Account created successfully"
