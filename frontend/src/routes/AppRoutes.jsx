@@ -11,6 +11,7 @@ import QRCode from "../pages/QRCode/QRCode";
 import Reports from "../pages/Reports/Reports";
 import Settings from "../pages/Settings/Settings";
 import Signup from "../pages/Signup/Signup";
+import Emergency from "../pages/Emergency/Emergency";
 
 export default function AppRoutes({ userName, onUserNameChange }) {
   return (
@@ -38,6 +39,10 @@ export default function AppRoutes({ userName, onUserNameChange }) {
       <Route
         path="/blood-donor"
         element={<BloodDonor userName={userName} />}
+      />
+      <Route
+        path="/emergency/:userId"
+        element={<Emergency />}
       />
       <Route
         path="/ai-assistant"

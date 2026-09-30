@@ -1,3 +1,4 @@
+import os
 import json
 import time
 from app import app
@@ -135,7 +136,7 @@ def run_tests():
     assert res.status_code == 200, f"Expected 200, got {res.status_code}"
     user_info = res.get_json()
     print("  -> SUCCESS: QR User Info fetched:", user_info)
-    assert user_info["user"]["bloodgroup"] == "O+"
+    assert user_info["profile"]["blood_group"] == "O+"
 
     # 6b. GET /api/qr/image/<user_id>
     print(f"\n[TEST 8] GET /api/qr/image/{user_id}...")
@@ -144,6 +145,11 @@ def run_tests():
     assert res.content_type == "image/png"
     assert len(res.data) > 0
     print(f"  -> SUCCESS: QR image downloaded ({len(res.data)} bytes, PNG format).")
+    res.close()
+
+    qr_path = os.path.join("qr_codes", f"user_{user_id}.png")
+    if os.path.exists(qr_path):
+        os.remove(qr_path)
 
     # Clean up test user and profile
     print("\n[CLEANUP] Removing test user data...")
