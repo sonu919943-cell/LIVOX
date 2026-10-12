@@ -151,10 +151,66 @@ def run_tests():
     if os.path.exists(qr_path):
         os.remove(qr_path)
 
+    # 7. Test Medical Reports Routes
+    print("\n[TEST 9] Medical Reports Routes (/api/reports)...")
+    # 7a. Initial reports list should be empty
+    res = client.get("/api/reports", headers=auth_headers)
+    assert res.status_code == 200, f"Expected 200, got {res.status_code}"
+    rep_data = res.get_json()
+    assert "reports" in rep_data
+    print(f"  -> Initial GET /api/reports: {len(rep_data['reports'])} reports")
+
+    # 7b. Upload a simulated report
+    import io
+    dummy_pdf = (io.BytesIO(b"%PDF-1.4 simulated pdf test content"), "Blood_test_report.pdf")
+    upload_data = {
+        "file": dummy_pdf,
+        "type": "Lab result",
+        "name": "Blood test report.pdf"
+    }
+    res = client.post(
+        "/api/reports/upload",
+        headers=auth_headers,
+        data=upload_data,
+        content_type="multipart/form-data"
+    )
+    assert res.status_code == 201, f"Expected 201 for report upload, got {res.status_code}: {res.get_json()}"
+    uploaded_report = res.get_json()["report"]
+    report_id = uploaded_report["id"]
+    print(f"  -> SUCCESS: Uploaded report ID {report_id}: {uploaded_report['name']}")
+
+    # 7c. GET /api/reports to verify listing
+    res = client.get("/api/reports", headers=auth_headers)
+    assert res.status_code == 200
+    reports_list = res.get_json().get("reports", [])
+    assert len(reports_list) >= 1
+    assert reports_list[0]["id"] == report_id
+    print("  -> SUCCESS: Report listed correctly in /api/reports")
+
+    # 7d. View report file via inline GET
+    res = client.get(f"/api/reports/{report_id}/view?token={token}")
+    assert res.status_code == 200
+    assert len(res.data) > 0
+    res.close()
+    print("  -> SUCCESS: Report viewable via /api/reports/<id>/view")
+
+    # 7e. Download report file via attachment GET
+    res = client.get(f"/api/reports/{report_id}/download?token={token}")
+    assert res.status_code == 200
+    assert len(res.data) > 0
+    res.close()
+    print("  -> SUCCESS: Report downloadable via /api/reports/<id>/download")
+
+    # 7f. Delete report
+    res = client.delete(f"/api/reports/{report_id}", headers=auth_headers)
+    assert res.status_code == 200
+    print("  -> SUCCESS: Report deleted via DELETE /api/reports/<id>")
+
     # Clean up test user and profile
     print("\n[CLEANUP] Removing test user data...")
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute("DELETE FROM medical_reports WHERE user_id = %s;", (user_id,))
     cursor.execute("DELETE FROM medical_profile WHERE user_id = %s;", (user_id,))
     cursor.execute("DELETE FROM users WHERE id = %s;", (user_id,))
     conn.commit()

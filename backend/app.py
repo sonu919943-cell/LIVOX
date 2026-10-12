@@ -12,6 +12,7 @@ from flask_jwt_extended import JWTManager
 from routes.auth_routes import auth
 from routes.medical_routes import medical
 from routes.qr_routes import qr
+from routes.report_routes import report
 
 app = Flask(__name__)
 
@@ -31,6 +32,7 @@ JWTManager(app)
 app.register_blueprint(auth)
 app.register_blueprint(medical)
 app.register_blueprint(qr, url_prefix="/api/qr")
+app.register_blueprint(report, url_prefix="/api/reports")
 
 @app.route("/")
 def home():
@@ -43,8 +45,14 @@ def home():
             "generate_qr": "/api/qr/generate",
             "qr_user": "/api/qr/user/<user_id>",
             "qr_image": "/api/qr/image/<user_id>",
+            "reports_list": "/api/reports",
+            "reports_upload": "/api/reports/upload",
+            "reports_view": "/api/reports/<id>/view",
+            "reports_download": "/api/reports/<id>/download",
+            "reports_delete": "/api/reports/<id>",
         },
     }
+
 
 if __name__ == "__main__":
     app.run(debug=True)

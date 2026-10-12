@@ -24,4 +24,14 @@ CREATE TABLE medical_profile (
     user_id INT UNIQUE,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
-    
+
+CREATE TABLE medical_reports (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    file_type VARCHAR(100) DEFAULT 'Lab result',
+    file_size INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

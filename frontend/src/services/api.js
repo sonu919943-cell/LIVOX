@@ -6,10 +6,11 @@ export function buildApiUrl(path) {
 }
 
 export async function api(path, options = {}) {
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const response = await fetch(buildApiUrl(path), {
     ...options,
     headers: {
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(!isFormData && options.body ? { "Content-Type": "application/json" } : {}),
       ...options.headers,
     },
   });

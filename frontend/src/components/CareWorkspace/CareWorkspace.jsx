@@ -240,7 +240,7 @@ function renderScreen({
         <Contacts contacts={contacts} setContacts={setContacts} save={save} />
       );
     case "reports":
-      return <Reports save={save} />;
+      return <Reports save={save} token={token} />;
     case "qr":
       return <QR save={save} token={token} userName={userName} />;
     case "hospitals":
@@ -542,58 +542,196 @@ function Contacts({ contacts, setContacts, save }) {
     </>
   );
 }
-function Reports({ save }) {
-  const [files, setFiles] = useState([
-    { name: "Blood test report.pdf", type: "Lab result", date: "08 Sep 2026" },
-    { name: "Prescription.pdf", type: "Prescription", date: "01 Sep 2026" },
-  ]);
+function formatFileSize(bytes) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getFileBadge(filename = "") {
+  const ext = filename.split(".").pop()?.toUpperCase() || "DOC";
+  return ext.slice(0, 4);
+}
+
+function Reports({ save, token }) {
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    let isMounted = true;
+    setLoading(true);
+    api("/api/reports", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((data) => {
+        if (isMounted && data?.reports) {
+          setFiles(data.reports);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch reports:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!token) {
+      save("Please sign in to upload reports to your secure vault.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("name", file.name);
+
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      let detectedType = "Lab result";
+      if (file.name.toLowerCase().includes("prescription")) {
+        detectedType = "Prescription";
+      } else if (["jpg", "jpeg", "png", "webp"].includes(ext)) {
+        detectedType = "Medical scan";
+      }
+      formData.append("type", detectedType);
+
+      const response = await api("/api/reports/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (response?.report) {
+        setFiles((prev) => [response.report, ...prev]);
+        save(`"${file.name}" uploaded to secure vault.`);
+      }
+    } catch (err) {
+      save(err.message || "Failed to upload document.");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleOpen = (file) => {
+    if (file.view_url) {
+      const fullUrl = buildApiUrl(
+        `${file.view_url}${token ? `?token=${encodeURIComponent(token)}` : ""}`
+      );
+      window.open(fullUrl, "_blank", "noopener,noreferrer");
+      save(`Opened "${file.name}".`);
+    } else {
+      save(`Opened "${file.name}".`);
+    }
+  };
+
+  const handleDownload = (file) => {
+    if (file.download_url) {
+      const fullUrl = buildApiUrl(
+        `${file.download_url}${token ? `?token=${encodeURIComponent(token)}` : ""}`
+      );
+      const link = document.createElement("a");
+      link.href = fullUrl;
+      link.download = file.name || "report";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      save(`Downloading "${file.name}".`);
+    } else {
+      save(`Downloading "${file.name}".`);
+    }
+  };
+
+  const handleDelete = async (file) => {
+    if (!token || !file.id) return;
+    if (!window.confirm(`Delete "${file.name}" permanently?`)) return;
+
+    try {
+      await api(`/api/reports/${file.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setFiles((prev) => prev.filter((item) => item.id !== file.id));
+      save(`Deleted "${file.name}".`);
+    } catch (err) {
+      save(err.message || "Failed to delete report.");
+    }
+  };
+
   return (
     <>
       <div className="care-heading">
         <div>
           <p>DOCUMENT VAULT</p>
           <h1>Medical reports</h1>
-          <span>Keep health documents organized and accessible.</span>
+          <span>Keep health documents organized, encrypted, and accessible.</span>
         </div>
-        <label className="care-primary">
-          Upload report
+        <label className="care-primary" style={{ cursor: uploading ? "wait" : "pointer" }}>
+          {uploading ? "Uploading..." : "Upload report"}
           <input
             hidden
             type="file"
-            onChange={(e) => {
-              if (e.target.files[0]) {
-                setFiles([
-                  ...files,
-                  {
-                    name: e.target.files[0].name,
-                    type: "New upload",
-                    date: "Today",
-                  },
-                ]);
-                save("Report added to your local workspace.");
-              }
-            }}
+            disabled={uploading}
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.txt"
+            onChange={handleUpload}
           />
         </label>
       </div>
       <Panel
         title="Your documents"
-        caption={`${files.length} documents in your secure workspace.`}
+        caption={
+          loading
+            ? "Loading your secure documents..."
+            : `${files.length} document${files.length === 1 ? "" : "s"} in your secure workspace.`
+        }
       >
-        <div className="care-docs">
-          {files.map((file, index) => (
-            <article key={index}>
-              <b>PDF</b>
-              <div>
-                <strong>{file.name}</strong>
-                <span>
-                  {file.type} - {file.date}
-                </span>
-              </div>
-              <button onClick={() => save(`Opened ${file.name}.`)}>Open</button>
-            </article>
-          ))}
-        </div>
+        {files.length === 0 && !loading ? (
+          <div className="care-empty">
+            No medical documents found in your vault. Click <strong>Upload report</strong> above to store lab results, prescriptions, and scans.
+          </div>
+        ) : (
+          <div className="care-docs">
+            {files.map((file, index) => (
+              <article key={file.id || index}>
+                <b>{getFileBadge(file.name)}</b>
+                <div>
+                  <strong>{file.name}</strong>
+                  <span>
+                    {file.type} {file.size ? `• ${formatFileSize(file.size)}` : ""} • {file.date}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button onClick={() => handleOpen(file)}>Open</button>
+                  <button onClick={() => handleDownload(file)}>Download</button>
+                  <button
+                    onClick={() => handleDelete(file)}
+                    style={{ color: "#c0392b", borderColor: "#f2dede" }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </Panel>
     </>
   );
