@@ -232,21 +232,21 @@ function renderScreen({
 }) {
   switch (screen) {
     case "dashboard":
-      return <Dashboard userName={userName} />;
+      return <Dashboard userName={userName} token={token} />;
     case "profile":
       return <Profile profile={profile} update={update} saveProfile={saveProfile} />;
     case "contacts":
       return (
-        <Contacts contacts={contacts} setContacts={setContacts} save={save} />
+        <Contacts save={save} token={token} />
       );
     case "reports":
       return <Reports save={save} token={token} />;
     case "qr":
       return <QR save={save} token={token} userName={userName} />;
     case "hospitals":
-      return <Hospitals save={save} />;
+      return <Hospitals save={save} token={token} />;
     case "donors":
-      return <Donors save={save} />;
+      return <Donors save={save} token={token} />;
     case "assistant":
       return (
         <Assistant
@@ -254,36 +254,36 @@ function renderScreen({
           message={message}
           setMessage={setMessage}
           setMessages={setMessages}
+          token={token}
         />
       );
     case "account":
-      return <Account save={save} userName={userName} />;
+      return <Account save={save} userName={userName} token={token} />;
     default:
-      return <Settings save={save} />;
+      return <Settings save={save} token={token} />;
   }
 }
 
-function Dashboard({ userName }) {
+function Dashboard({ userName, token }) {
+  const [stats, setStats] = useState({ reports: 0, contacts: 0, profile_completion: 0, has_profile: false });
+
+  useEffect(() => {
+    if (!token) return;
+    api("/api/dashboard/stats", { headers: { Authorization: `Bearer ${token}` } })
+      .then((data) => setStats(data.stats || stats))
+      .catch((error) => console.error("Dashboard stats could not load:", error.message));
+  }, [token]);
+
   const today = new Intl.DateTimeFormat("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  })
-    .format(new Date())
-    .toUpperCase();
+    weekday: "long", day: "numeric", month: "long",
+  }).format(new Date()).toUpperCase();
+
   const modules = [
-    [
-      "Medical profile",
-      "Add your blood group and allergy details",
-      "/medical-profile",
-    ],
-    [
-      "Emergency contacts",
-      "Confirm who should be contacted first",
-      "/emergency-contacts",
-    ],
-    ["Emergency QR", "Your emergency card is available", "/qr-code"],
+    ["Medical profile", "Add your blood group and allergy details", "/medical-profile"],
+    ["Emergency contacts", "Confirm who should be contacted first", "/emergency-contacts"],
+    ["Emergency QR", "Create your emergency access card", "/qr-code"],
   ];
+
   return (
     <>
       <section className="care-welcome">
@@ -292,89 +292,34 @@ function Dashboard({ userName }) {
           <h1>Welcome back, {getFirstName(userName)}.</h1>
           <span>Here is the information that needs your attention today.</span>
         </div>
-        <Link to="/medical-profile">
-          Complete profile <b>&rarr;</b>
-        </Link>
+        <Link to="/medical-profile">Complete profile <b>&rarr;</b></Link>
       </section>
       <section className="care-stats">
         <article>
           <span>PROFILE COMPLETION</span>
-          <strong>75%</strong>
-          <div>
-            <i style={{ width: "68%" }} />
-          </div>
-          <small>4 details remaining</small>
+          <strong>{stats.profile_completion}%</strong>
+          <div><i style={{ width: `${stats.profile_completion}%` }} /></div>
+          <small>{stats.has_profile ? "Keep your details up to date" : "Add your medical profile"}</small>
         </article>
         <article>
-          <span>EMERGENCY CARD</span>
-          <strong className="ok">Active</strong>
-          <small>Your QR card is ready to share</small>
-          <Link to="/qr-code">View card</Link>
+          <span>EMERGENCY CONTACTS</span>
+          <strong>{stats.contacts}</strong>
+          <small>Saved trusted contacts</small>
+          <Link to="/emergency-contacts">Manage contacts</Link>
         </article>
         <article>
           <span>HEALTH DOCUMENTS</span>
-          <strong>4</strong>
-          <small>Reports securely stored</small>
+          <strong>{stats.reports}</strong>
+          <small>Reports in your workspace</small>
           <Link to="/reports">Manage reports</Link>
         </article>
       </section>
-      <section className="care-layout">
-        <Panel
-          title="Today's checklist"
-          caption="Small updates make your emergency profile more useful."
-        >
-          <div className="care-check">
-            <span>1</span>
-            <div>
-              <strong>Add blood group</strong>
-              <p>This helps clinicians make fast decisions.</p>
-            </div>
-            <Link to="/medical-profile">Update</Link>
-          </div>
-          <div className="care-check">
-            <span>2</span>
-            <div>
-              <strong>Confirm emergency contact</strong>
-              <p>Make sure their phone number is current.</p>
-            </div>
-            <Link to="/emergency-contacts">Review</Link>
-          </div>
-          <div className="care-check">
-            <span>3</span>
-            <div>
-              <strong>Review medications</strong>
-              <p>Keep dosage and medicine names accurate.</p>
-            </div>
-            <Link to="/medical-profile">Update</Link>
-          </div>
-        </Panel>
-        <Panel title="Recent activity" caption="Your health record timeline.">
-          <div className="care-timeline">
-            <i />
-            <div>
-              <strong>Workspace created</strong>
-              <span>Today</span>
-            </div>
-          </div>
-          <div className="care-empty">
-            Your updates will appear here as you use LIVOX.
-          </div>
-        </Panel>
-      </section>
       <section className="care-section">
-        <header>
-          <div>
-            <h2>Quick access</h2>
-            <p>Use these areas to keep your care information up to date.</p>
-          </div>
-        </header>
+        <header><div><h2>Quick access</h2><p>Keep your health and emergency information up to date.</p></div></header>
         <div className="care-module-grid">
           {modules.map(([title, text, path], index) => (
             <Link to={path} key={path} className="care-module">
-              <b>0{index + 1}</b>
-              <h3>{title}</h3>
-              <p>{text}</p>
-              <span>Open &rarr;</span>
+              <b>0{index + 1}</b><h3>{title}</h3><p>{text}</p><span>Open &rarr;</span>
             </Link>
           ))}
         </div>
@@ -472,72 +417,90 @@ function Profile({ profile, update, saveProfile }) {
     </>
   );
 }
-function Contacts({ contacts, setContacts, save }) {
-  const change = (index, key, value) =>
-    setContacts(
-      contacts.map((item, i) =>
-        i === index ? { ...item, [key]: value } : item,
-      ),
-    );
+function Contacts({ save, token }) {
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!token) { setLoading(false); return; }
+    api("/emergency-contacts", { headers: { Authorization: `Bearer ${token}` } })
+      .then((data) => setContacts((data.contacts || []).map((item) => ({
+        id: item.id, name: item.name, relation: item.relationship, phone: item.phone,
+      }))))
+      .catch((error) => save(error.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const change = (index, key, value) => setContacts((prev) =>
+    prev.map((item, i) => i === index ? { ...item, [key]: value } : item));
+
+  const saveContacts = async () => {
+    if (!token) { save("Please sign in again."); return; }
+    setSaving(true);
+    try {
+      const saved = [];
+      for (const item of contacts) {
+        if (!item.name.trim() || !item.phone.trim() || !item.relation.trim()) {
+          throw new Error("Complete the name, relationship, and phone for each contact.");
+        }
+        const payload = { name: item.name.trim(), phone: item.phone.trim(), relationship: item.relation.trim() };
+        if (item.id) {
+          await api(`/emergency-contacts/${item.id}`, {
+            method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(payload),
+          });
+          saved.push({ ...item, ...payload, relation: payload.relationship });
+        } else {
+          const data = await api("/emergency-contacts", {
+            method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(payload),
+          });
+          saved.push({ ...data.contact, relation: data.contact.relationship });
+        }
+      }
+      setContacts(saved);
+      save("Emergency contacts saved to your account.");
+    } catch (error) {
+      save(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeContact = async (index) => {
+    const item = contacts[index];
+    if (item.id && token) {
+      try {
+        await api(`/emergency-contacts/${item.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      } catch (error) {
+        save(error.message);
+        return;
+      }
+    }
+    setContacts((prev) => prev.filter((_, i) => i !== index));
+    save("Contact removed.");
+  };
+
   return (
     <>
       <div className="care-heading">
-        <div>
-          <p>SAFETY NETWORK</p>
-          <h1>Emergency contacts</h1>
-          <span>
-            Choose people LIVOX should help you reach in an emergency.
-          </span>
-        </div>
-        <button
-          className="care-primary"
-          onClick={() =>
-            setContacts([...contacts, { name: "", relation: "", phone: "" }])
-          }
-        >
-          Add contact
-        </button>
+        <div><p>SAFETY NETWORK</p><h1>Emergency contacts</h1><span>Manage trusted people to contact in an emergency.</span></div>
+        <button className="care-primary" onClick={() => setContacts((prev) => [...prev, { name: "", relation: "", phone: "" }])}>Add contact</button>
       </div>
-      <Panel
-        title="Your contacts"
-        caption="The first listed contact is treated as primary."
-      >
+      <Panel title="Your contacts" caption={loading ? "Loading saved contacts..." : `${contacts.length} contact(s) saved to your account.`}>
+        {contacts.length === 0 && !loading && <div className="care-empty">No contacts yet. Select “Add contact” to begin.</div>}
         <div className="care-contact-table">
-          <div className="care-table-head">
-            <span>Priority</span>
-            <span>Name</span>
-            <span>Relationship</span>
-            <span>Phone</span>
-          </div>
+          <div className="care-table-head"><span>Priority</span><span>Name</span><span>Relationship</span><span>Phone</span></div>
           {contacts.map((item, index) => (
-            <div className="care-table-row" key={index}>
+            <div className="care-table-row" key={item.id || `new-${index}`}>
               <b>{index + 1}</b>
-              <input
-                value={item.name}
-                onChange={(e) => change(index, "name", e.target.value)}
-                placeholder="Contact name"
-              />
-              <input
-                value={item.relation}
-                onChange={(e) => change(index, "relation", e.target.value)}
-                placeholder="Relationship"
-              />
-              <input
-                value={item.phone}
-                onChange={(e) => change(index, "phone", e.target.value)}
-                placeholder="Phone number"
-              />
+              <input value={item.name} onChange={(e) => change(index, "name", e.target.value)} placeholder="Contact name" />
+              <input value={item.relation} onChange={(e) => change(index, "relation", e.target.value)} placeholder="Relationship" />
+              <input value={item.phone} onChange={(e) => change(index, "phone", e.target.value)} placeholder="Phone number" />
+              <button type="button" onClick={() => removeContact(index)} aria-label={`Remove ${item.name || "contact"}`}>Remove</button>
             </div>
           ))}
         </div>
-        <div className="care-actions">
-          <button
-            className="care-primary"
-            onClick={() => save("Emergency contacts saved locally.")}
-          >
-            Save contacts
-          </button>
-        </div>
+        <div className="care-actions"><button className="care-primary" onClick={saveContacts} disabled={saving}>{saving ? "Saving..." : "Save contacts"}</button></div>
       </Panel>
     </>
   );
@@ -629,32 +592,54 @@ function Reports({ save, token }) {
     }
   };
 
-  const handleOpen = (file) => {
-    if (file.view_url) {
-      const fullUrl = buildApiUrl(
-        `${file.view_url}${token ? `?token=${encodeURIComponent(token)}` : ""}`
-      );
-      window.open(fullUrl, "_blank", "noopener,noreferrer");
+  const fetchReportBlob = async (path) => {
+    const response = await fetch(buildApiUrl(path), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || "Unable to retrieve this report.");
+    }
+    return response.blob();
+  };
+
+  const handleOpen = async (file) => {
+    if (!file.view_url || !token) return;
+    const tab = window.open("about:blank", "_blank");
+    try {
+      const blob = await fetchReportBlob(file.view_url);
+      const objectUrl = URL.createObjectURL(blob);
+      if (tab) {
+        tab.location.href = objectUrl;
+      } else {
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.click();
+      }
       save(`Opened "${file.name}".`);
-    } else {
-      save(`Opened "${file.name}".`);
+    } catch (error) {
+      if (tab) tab.close();
+      save(error.message);
     }
   };
 
-  const handleDownload = (file) => {
-    if (file.download_url) {
-      const fullUrl = buildApiUrl(
-        `${file.download_url}${token ? `?token=${encodeURIComponent(token)}` : ""}`
-      );
+  const handleDownload = async (file) => {
+    if (!file.download_url || !token) return;
+    try {
+      const blob = await fetchReportBlob(file.download_url);
+      const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = fullUrl;
+      link.href = objectUrl;
       link.download = file.name || "report";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
       save(`Downloading "${file.name}".`);
-    } else {
-      save(`Downloading "${file.name}".`);
+    } catch (error) {
+      save(error.message);
     }
   };
 
@@ -769,13 +754,13 @@ function QR({ save, token, userName }) {
         <div>
           <p>EMERGENCY ACCESS</p>
           <h1>Emergency QR card</h1>
-          <span>A scannable card that can share selected medical details.</span>
+          <span>Enable emergency QR sharing in Settings and save your medical profile before generating a card.</span>
         </div>
       </div>
       <section className="care-qr-layout">
         <Panel
           title="Your active card"
-          caption="Only the information you choose is shared."
+          caption="Anyone who scans your card can view the selected emergency details. Enable sharing in Settings first."
         >
           <div className="care-qr">
             {qr?.image_url ? (
@@ -797,7 +782,7 @@ function QR({ save, token, userName }) {
             <small>
               {qr?.qr_url
                 ? "Scan to access emergency health details"
-                : "Generate your QR after saving your medical profile"}
+                : "Enable emergency QR sharing in Settings, then generate your QR"}
             </small>
           </div>
           <div className="care-qr-actions">
@@ -831,236 +816,299 @@ function QR({ save, token, userName }) {
     </>
   );
 }
-function Hospitals({ save }) {
-  const [searched, setSearched] = useState(false);
-  const hospitals = [
-    ["City Care Hospital", "2.1 km away", "24 hours - Emergency care"],
-    [
-      "Green Valley Medical Centre",
-      "3.7 km away",
-      "24 hours - Multi-specialty",
-    ],
-    ["Sunrise Clinic", "4.5 km away", "Open until 9:00 PM"],
-  ];
+function Hospitals({ save, token }) {
+  const [places, setPlaces] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const findHospitals = () => {
+    if (!token) { save("Please sign in to search nearby hospitals."); return; }
+    if (!navigator.geolocation) { setError("This browser does not support location access."); return; }
+    setLoading(true);
+    setError("");
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      try {
+        const params = new URLSearchParams({
+          lat: String(position.coords.latitude),
+          lon: String(position.coords.longitude),
+          radius: "10000",
+        });
+        const data = await api(`/api/hospitals/nearby?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setPlaces(data.hospitals || []);
+        if (!data.hospitals?.length) setError("No mapped hospitals or clinics were found nearby.");
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }, (geoError) => {
+      setLoading(false);
+      setError(geoError.code === 1 ? "Location permission was denied. Allow location access and try again." : "Could not get your location. Check device location settings.");
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+  };
+
   return (
     <>
       <div className="care-heading">
-        <div>
-          <p>CARE NEAR YOU</p>
-          <h1>Hospitals</h1>
-          <span>Find nearby medical facilities when you need care.</span>
-        </div>
-        <button
-          className="care-primary"
-          onClick={() => {
-            setSearched(true);
-            save("Nearby facilities refreshed.");
-          }}
-        >
-          Use my location
-        </button>
+        <div><p>CARE NEAR YOU</p><h1>Hospitals</h1><span>Search mapped hospitals and clinics near your current location.</span></div>
+        <button className="care-primary" onClick={findHospitals} disabled={loading}>{loading ? "Searching..." : "Use my location"}</button>
       </div>
-      <Panel
-        title={searched ? "Facilities near you" : "Search nearby care"}
-        caption="Location is only used after you request a search."
-      >
-        <div className="care-map">
-          <div>
-            <b>+</b>
-            <span>Map view</span>
-            <small>Select "Use my location" to refresh results.</small>
-          </div>
-        </div>
+      <Panel title="Nearby facilities" caption="Your location is requested only after you press the search button.">
+        {error && <p className="care-empty">{error}</p>}
+        {places.length === 0 && !loading && !error && <div className="care-empty">Press “Use my location” to find nearby hospitals and clinics. Results are from OpenStreetMap and may not be complete.</div>}
         <div className="care-hospital-list">
-          {hospitals.map(([name, distance, detail]) => (
-            <article key={name}>
-              <b>H</b>
-              <div>
-                <strong>{name}</strong>
-                <span>
-                  {distance} - {detail}
-                </span>
-              </div>
-              <button
-                onClick={() => save(`Directions to ${name} opened locally.`)}
-              >
-                Directions
-              </button>
+          {places.map((place, index) => (
+            <article key={`${place.name}-${place.lat}-${place.lon}`}>
+              <b>H</b><div><strong>{place.name}</strong><span>{place.distance_km} km · {place.type}{place.address ? ` · ${place.address}` : ""}{place.phone ? ` · ${place.phone}` : ""}</span></div>
+              <a href={`https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lon}`} target="_blank" rel="noreferrer">Directions</a>
             </article>
           ))}
         </div>
+        <small>Map data © OpenStreetMap contributors. In an emergency, call your local emergency number.</small>
       </Panel>
     </>
   );
 }
-function Donors({ save }) {
+function Donors({ save, token }) {
   const [group, setGroup] = useState("");
+  const [city, setCity] = useState("");
+  const [donors, setDonors] = useState([]);
+  const [searched, setSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [showRegistration, setShowRegistration] = useState(false);
+  const [myDonor, setMyDonor] = useState({ blood_group: "O+", city: "", phone: "", available: true, consent: false });
+  const [registering, setRegistering] = useState(false);
+
+  const search = async (event) => {
+    event?.preventDefault();
+    if (!token) { save("Please sign in to search donor listings."); return; }
+    if (!group && !city.trim()) { save("Enter a blood group or city to search."); return; }
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (group) params.set("blood_group", group);
+      if (city.trim()) params.set("city", city.trim());
+      const data = await api(`/api/donors?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setDonors(data.donors || []);
+      setSearched(true);
+      if (!data.donors?.length) save("No consented donor listings matched your search.");
+    } catch (error) {
+      save(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const registerDonor = async (event) => {
+    event.preventDefault();
+    if (!token) { save("Please sign in again."); return; }
+    if (!myDonor.consent) { save("Consent is required before publishing your donor listing."); return; }
+    setRegistering(true);
+    try {
+      await api("/api/donors", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify(myDonor),
+      });
+      save("Your opt-in donor listing was saved.");
+      setShowRegistration(false);
+    } catch (error) {
+      save(error.message);
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const removeDonor = async () => {
+    if (!token || !window.confirm("Remove your donor listing?")) return;
+    try {
+      await api("/api/donors", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      save("Your donor listing was removed.");
+    } catch (error) {
+      save(error.message);
+    }
+  };
+
   return (
     <>
       <div className="care-heading">
-        <div>
-          <p>COMMUNITY CARE</p>
-          <h1>Blood donors</h1>
-          <span>Search for nearby donors by blood group and location.</span>
-        </div>
+        <div><p>COMMUNITY CARE</p><h1>Blood donors</h1><span>Search opt-in donor listings by blood group and city.</span></div>
+        <button className="care-primary" onClick={() => setShowRegistration((value) => !value)}>{showRegistration ? "Close form" : "Register as donor"}</button>
       </div>
-      <Panel
-        title="Find donors"
-        caption="Use verified donor information responsibly."
-      >
-        <div className="care-search-row">
-          <input
-            value={group}
-            onChange={(e) => setGroup(e.target.value)}
-            placeholder="Blood group, e.g. O positive"
-          />
-          <input placeholder="City or area" />
-          <button
-            className="care-primary"
-            onClick={() =>
-              save(
-                group
-                  ? `Searching for ${group} donors locally.`
-                  : "Enter a blood group to search.",
-              )
-            }
-          >
-            Search
-          </button>
+      {showRegistration && (
+        <Panel title="Register as a donor" caption="Your phone number is visible to signed-in LIVOX users only when you consent.">
+          <form onSubmit={registerDonor}>
+            <div className="care-form">
+              <label className="care-field"><span>Blood group</span>
+                <select value={myDonor.blood_group} onChange={(e) => setMyDonor({ ...myDonor, blood_group: e.target.value })}>
+                  {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </label>
+              <Field label="City or area" value={myDonor.city} onChange={(value) => setMyDonor({ ...myDonor, city: value })} placeholder="e.g. Faridabad" />
+              <Field label="Phone number" value={myDonor.phone} onChange={(value) => setMyDonor({ ...myDonor, phone: value })} placeholder="Phone number" />
+            </div>
+            <label className="care-field"><span><input type="checkbox" checked={myDonor.available} onChange={(e) => setMyDonor({ ...myDonor, available: e.target.checked })} /> I am currently available to donate</span></label>
+            <label className="care-field"><span><input required type="checkbox" checked={myDonor.consent} onChange={(e) => setMyDonor({ ...myDonor, consent: e.target.checked })} /> I consent to share my donor listing and phone with signed-in users</span></label>
+            <div className="care-actions"><button className="care-primary" disabled={registering}>{registering ? "Saving..." : "Save donor listing"}</button><button type="button" onClick={removeDonor}>Remove my listing</button></div>
+          </form>
+        </Panel>
+      )}
+      <Panel title="Find donors" caption="Only donors who have explicitly consented to appear are listed.">
+        <form className="care-search-row" onSubmit={search}>
+          <select value={group} onChange={(e) => setGroup(e.target.value)}>
+            <option value="">Any blood group</option>
+            {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
+          <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City or area" />
+          <button className="care-primary" disabled={loading}>{loading ? "Searching..." : "Search"}</button>
+        </form>
+        {searched && donors.length === 0 && <div className="care-empty">No matching donor listings. Try a different blood group or city.</div>}
+        <div className="care-hospital-list">
+          {donors.map((donor) => (
+            <article key={donor.id}><b>{donor.blood_group}</b><div><strong>{donor.city}</strong><span>Opt-in donor · Contact: {donor.phone}</span></div><a href={`tel:${donor.phone}`}>Call</a></article>
+          ))}
         </div>
-        <div className="care-empty">
-          Donor results will appear after your local search.
-        </div>
+        <small>Use listings responsibly. Verify availability and compatibility with a qualified medical professional or blood bank.</small>
       </Panel>
     </>
   );
 }
-function Assistant({ messages, message, setMessage, setMessages }) {
-  const send = (e) => {
-    e.preventDefault();
-    if (!message.trim()) return;
-    setMessages([
-      ...messages,
-      { role: "user", text: message },
-      {
-        role: "assistant",
-        text: "I can help you organize health information, but I cannot diagnose conditions. For urgent symptoms, contact a qualified clinician or emergency service.",
-      },
-    ]);
+function Assistant({ messages, message, setMessage, setMessages, token }) {
+  const [sending, setSending] = useState(false);
+  const send = async (event) => {
+    event.preventDefault();
+    const question = message.trim();
+    if (!question || sending) return;
+    if (!token) { setMessages((prev) => [...prev, { role: "assistant", text: "Please sign in again to use the care assistant." }]); return; }
+    setMessages((prev) => [...prev, { role: "user", text: question }]);
     setMessage("");
+    setSending(true);
+    try {
+      const data = await api("/api/assistant/chat", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message: question }),
+      });
+      setMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
+    } catch (error) {
+      setMessages((prev) => [...prev, { role: "assistant", text: error.message }]);
+    } finally {
+      setSending(false);
+    }
   };
   return (
     <>
-      <div className="care-heading">
-        <div>
-          <p>LIVOX CARE ASSISTANT</p>
-          <h1>Care assistant</h1>
-          <span>General health information and help using your workspace.</span>
-        </div>
-      </div>
-      <section className="care-chat">
-        {messages.map((item, index) => (
-          <p className={`care-bubble care-bubble--${item.role}`} key={index}>
-            {item.text}
-          </p>
-        ))}
+      <div className="care-heading"><div><p>LIVOX CARE ASSISTANT</p><h1>Care assistant</h1><span>General health education and help using your workspace.</span></div></div>
+      <section className="care-chat" aria-live="polite">
+        {messages.map((item, index) => <p className={`care-bubble care-bubble--${item.role}`} key={index}>{item.text}</p>)}
+        {sending && <p className="care-bubble care-bubble--assistant">Thinking…</p>}
       </section>
       <form className="care-compose" onSubmit={send}>
-        <input
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Ask about your LIVOX workspace..."
-        />
-        <button className="care-primary">Send</button>
+        <input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Ask a general health question..." maxLength={4000} />
+        <button className="care-primary" disabled={sending || !message.trim()}>{sending ? "Sending..." : "Send"}</button>
       </form>
+      <p className="care-empty">This assistant provides general information, not diagnosis or treatment. For urgent symptoms, contact local emergency services.</p>
     </>
   );
 }
-function Account({ save, userName }) {
+function Account({ save, userName, token }) {
+  const [form, setForm] = useState({ name: userName || "", email: "", phone: "" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!token) { setLoading(false); return; }
+    api("/api/account", { headers: { Authorization: `Bearer ${token}` } })
+      .then((data) => setForm({ name: data.user?.name || userName || "", email: data.user?.email || "", phone: data.user?.phone || "" }))
+      .catch((error) => save(error.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!token) { save("Please sign in again."); return; }
+    setSaving(true);
+    try {
+      const data = await api("/api/account", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: form.name, phone: form.phone }),
+      });
+      window.localStorage.setItem("livoxUserName", data.user.name);
+      setForm((prev) => ({ ...prev, name: data.user.name, phone: data.user.phone }));
+      save("Account details updated. Reload the page to refresh the workspace header.");
+    } catch (error) {
+      save(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
-      <div className="care-heading">
-        <div>
-          <p>ACCOUNT</p>
-          <h1>Account profile</h1>
-          <span>Manage the information used to sign in to LIVOX.</span>
-        </div>
-      </div>
-      <Panel
-        title="Account details"
-        caption="Update your personal account information."
-      >
-        <div className="care-form">
-          <Field label="Display name" value={userName} onChange={() => {}} />
-          <Field
-            label="Email address"
-            value="sonu@example.com"
-            onChange={() => {}}
-          />
-          <Field
-            label="Mobile number"
-            value=""
-            onChange={() => {}}
-            placeholder="+91 00000 00000"
-          />
-        </div>
-        <div className="care-actions">
-          <button className="care-primary" onClick={() => save()}>
-            Save account changes
-          </button>
-        </div>
+      <div className="care-heading"><div><p>ACCOUNT</p><h1>Account profile</h1><span>Manage the information used to sign in to LIVOX.</span></div></div>
+      <Panel title="Account details" caption={loading ? "Loading account..." : "Email address is read-only in this screen."}>
+        <form onSubmit={submit}>
+          <div className="care-form">
+            <Field label="Display name" value={form.name} onChange={(value) => setForm({ ...form, name: value })} placeholder="Full name" />
+            <Field label="Email address" value={form.email} onChange={() => {}} />
+            <Field label="Mobile number" value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} placeholder="+91 00000 00000" />
+          </div>
+          <div className="care-actions"><button className="care-primary" disabled={loading || saving}>{saving ? "Saving..." : "Save account changes"}</button></div>
+        </form>
       </Panel>
     </>
   );
 }
-function Settings({ save }) {
-  const [state, setState] = useState({
-    notify: true,
-    share: false,
-    reminder: true,
-  });
+function Settings({ save, token }) {
+  const defaults = { notify: true, share: false, reminder: true };
+  const [state, setState] = useState(defaults);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!token) { setLoading(false); return; }
+    api("/api/settings", { headers: { Authorization: `Bearer ${token}` } })
+      .then((data) => setState({ ...defaults, ...(data.settings || {}) }))
+      .catch((error) => save(error.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const submit = async () => {
+    if (!token) { save("Please sign in again."); return; }
+    setSaving(true);
+    try {
+      await api("/api/settings", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify(state),
+      });
+      save("Settings saved to your account.");
+    } catch (error) {
+      save(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
-      <div className="care-heading">
-        <div>
-          <p>PREFERENCES</p>
-          <h1>Settings</h1>
-          <span>Control notifications and how your information is used.</span>
-        </div>
-      </div>
-      <Panel
-        title="Privacy and notifications"
-        caption="You can change these options at any time."
-      >
+      <div className="care-heading"><div><p>PREFERENCES</p><h1>Settings</h1><span>Control notifications and emergency sharing preferences.</span></div></div>
+      <Panel title="Privacy and notifications" caption={loading ? "Loading preferences..." : "Changes are saved to your account."}>
         <div className="care-toggles">
           {[
             ["notify", "Health reminders and notifications"],
             ["share", "Allow emergency QR sharing"],
             ["reminder", "Monthly profile review reminder"],
           ].map(([key, label]) => (
-            <label key={key}>
-              <div>
-                <strong>{label}</strong>
-                <span>Manage this preference for your LIVOX account.</span>
-              </div>
-              <input
-                type="checkbox"
-                checked={state[key]}
-                onChange={(e) =>
-                  setState({ ...state, [key]: e.target.checked })
-                }
-              />
-            </label>
+            <label key={key}><div><strong>{label}</strong><span>Manage this preference for your LIVOX account.</span></div><input type="checkbox" checked={Boolean(state[key])} onChange={(e) => setState((prev) => ({ ...prev, [key]: e.target.checked }))} /></label>
           ))}
         </div>
-        <div className="care-actions">
-          <button
-            className="care-primary"
-            onClick={() => save("Settings saved locally.")}
-          >
-            Save preferences
-          </button>
-        </div>
+        <div className="care-actions"><button className="care-primary" onClick={submit} disabled={loading || saving}>{saving ? "Saving..." : "Save preferences"}</button></div>
       </Panel>
     </>
   );

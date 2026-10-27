@@ -58,15 +58,21 @@ def get_medical_records():
                 }), 400
 
             cursor.execute("""
-                DELETE FROM medical_profile
-                WHERE user_id = %s
-            """, (user_id,))
-
-            cursor.execute("""
-                INSERT INTO medical_profile 
-                (user_id, bloodgroup, name, dob, Allergies, phone, address, Existing_conditions, Current_medications)
+                INSERT INTO medical_profile
+                    (user_id, bloodgroup, name, dob, Allergies, phone, address,
+                     Existing_conditions, Current_medications)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (user_id, blood_group, name, dob, allergies, str(phone), address, existing_conditions, current_medications))
+                ON DUPLICATE KEY UPDATE
+                    bloodgroup = VALUES(bloodgroup),
+                    name = VALUES(name),
+                    dob = VALUES(dob),
+                    Allergies = VALUES(Allergies),
+                    phone = VALUES(phone),
+                    address = VALUES(address),
+                    Existing_conditions = VALUES(Existing_conditions),
+                    Current_medications = VALUES(Current_medications)
+            """, (user_id, blood_group, name, dob, allergies, str(phone), address,
+                  existing_conditions, current_medications))
 
             conn.commit()
 

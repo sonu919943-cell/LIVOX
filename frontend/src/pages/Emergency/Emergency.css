@@ -114,3 +114,34 @@
     margin-bottom: 5px;
   }
 }
+
+.emergency-contacts {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #e8edf3;
+}
+
+.emergency-contacts h3 {
+  color: #b42318;
+  margin: 0 0 12px;
+}
+
+.emergency-contacts p {
+  margin: 8px 0;
+  padding: 12px;
+  background: #fff5f5;
+  border-radius: 8px;
+}
+
+.emergency-contacts a {
+  color: #b42318;
+  font-weight: 700;
+}
+
+.emergency-footer {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+  margin-top: 20px;
+}

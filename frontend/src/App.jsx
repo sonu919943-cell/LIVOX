@@ -11,7 +11,7 @@ function getStoredUserName() {
 export default function App() {
   const { pathname } = useLocation();
   const [userName, setUserName] = useState(getStoredUserName);
-  const isPublicPage = pathname === "/login" || pathname === "/signup";
+  const isPublicPage = pathname === "/login" || pathname === "/signup" || pathname.startsWith("/emergency/");
 
   const saveUserName = (name) => {
     window.localStorage.setItem("livoxUserName", name);
