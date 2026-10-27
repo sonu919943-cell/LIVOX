@@ -206,10 +206,38 @@ def run_tests():
     assert res.status_code == 200
     print("  -> SUCCESS: Report deleted via DELETE /api/reports/<id>")
 
+    # 8. Test Emergency Contacts Routes
+    print("\n[TEST 10] Emergency Contacts Routes (/emergency-contacts)...")
+    # 8a. Add an emergency contact
+    contact_payload = {
+        "name": "Jane Doe",
+        "phone": "9876543211",
+        "relationship": "Spouse"
+    }
+    res = client.post("/emergency-contacts", headers=auth_headers, json=contact_payload)
+    assert res.status_code == 201, f"Expected 201, got {res.status_code}: {res.get_json()}"
+    contact_data = res.get_json().get("contact", {})
+    contact_id = contact_data.get("id")
+    print(f"  -> SUCCESS: Added emergency contact ID {contact_id}: {contact_data.get('name')}")
+
+    # 8b. Fetch emergency contacts
+    res = client.get("/emergency-contacts", headers=auth_headers)
+    assert res.status_code == 200, f"Expected 200, got {res.status_code}"
+    contacts_list = res.get_json().get("contacts", [])
+    assert len(contacts_list) >= 1
+    print(f"  -> SUCCESS: Retrieved {len(contacts_list)} emergency contact(s)")
+
+    # 8c. Delete emergency contact
+    if contact_id:
+        res = client.delete(f"/emergency-contacts/{contact_id}", headers=auth_headers)
+        assert res.status_code == 200, f"Expected 200, got {res.status_code}"
+        print(f"  -> SUCCESS: Deleted emergency contact ID {contact_id}")
+
     # Clean up test user and profile
     print("\n[CLEANUP] Removing test user data...")
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute("DELETE FROM emergency_contacts WHERE user_id = %s;", (user_id,))
     cursor.execute("DELETE FROM medical_reports WHERE user_id = %s;", (user_id,))
     cursor.execute("DELETE FROM medical_profile WHERE user_id = %s;", (user_id,))
     cursor.execute("DELETE FROM users WHERE id = %s;", (user_id,))

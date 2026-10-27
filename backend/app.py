@@ -13,6 +13,7 @@ from routes.auth_routes import auth
 from routes.medical_routes import medical
 from routes.qr_routes import qr
 from routes.report_routes import report
+from routes.emergency_contacts import emergency_contacts
 
 app = Flask(__name__)
 
@@ -33,6 +34,7 @@ app.register_blueprint(auth)
 app.register_blueprint(medical)
 app.register_blueprint(qr, url_prefix="/api/qr")
 app.register_blueprint(report, url_prefix="/api/reports")
+app.register_blueprint(emergency_contacts)
 
 @app.route("/")
 def home():
@@ -42,6 +44,7 @@ def home():
             "signup": "/signup",
             "login": "/login",
             "medical_profile": "/medical-profile",
+            "emergency_contacts": "/emergency-contacts",
             "generate_qr": "/api/qr/generate",
             "qr_user": "/api/qr/user/<user_id>",
             "qr_image": "/api/qr/image/<user_id>",

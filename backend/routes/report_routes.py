@@ -25,6 +25,7 @@ def ensure_reports_table():
     """Ensure medical_reports table exists."""
     conn = get_db_connection()
     if conn:
+        cursor = None
         try:
             cursor = conn.cursor()
             cursor.execute("""
@@ -43,7 +44,8 @@ def ensure_reports_table():
         except Exception:
             pass
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conn.close()
 
 
